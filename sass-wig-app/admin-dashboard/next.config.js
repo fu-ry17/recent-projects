@@ -4,7 +4,7 @@ const isDev = process.env.NODE_ENV !== "production";
 
 const withPWA = withPWAInit({
   dest: 'public',
-  disable: false, // can be disabled currently in dev
+  disable: isDev, // can be disabled currently in dev
   
   exclude: [
     // add buildExcludes here
