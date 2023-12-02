@@ -1,0 +1,291 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider     = "mysql"
+  url          = env("DATABASE_URL")
+  relationMode = "prisma"
+}
+
+model Store {
+  id     String  @id @default(uuid())
+  name   String
+  sheet  String? @db.Text //google sheet details
+  userId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  //relations
+  expenseCategories ExpenseCategory[]   @relation("StoreToCategoryExpense")
+  expenses          Expense[]           @relation("StoreToExpense")
+  appointments      Appointment[]       @relation("StoreToAppointment")
+  orderCategories   OrderCategory[]     @relation("StoreToOrderCategory")
+  products          Product[]           @relation("StoreToProduct")
+  orders            Order[]             @relation("StoreToOrder")
+  notifications     PushNotifications[] @relation("StoreToNotification")
+  productCategories ProductCategory[]   @relation("StoreToProductCategory")
+  comissions        Comission[]         @relation("StoreToComission")
+  apiKeys           ApiKey[]            @relation("StoreToApiKey")
+}
+
+model ExpenseCategory {
+  id   String @id @default(uuid())
+  name String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  storeId String
+  store   Store  @relation("StoreToCategoryExpense", fields: [storeId], references: [id])
+
+  expenses Expense[]
+
+  @@index([storeId])
+}
+
+model Expense {
+  id        String  @id @default(uuid())
+  title     String
+  amount    Decimal // amount decimal format
+  reference String
+  month     String
+  year      Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  expenseCategoryId String
+  expenseCategory   ExpenseCategory @relation(fields: [expenseCategoryId], references: [id])
+
+  storeId       String
+  store         Store          @relation("StoreToExpense", fields: [storeId], references: [id])
+  expenseImages ExpenseImage[] @relation("ExpenseToExpenseImage")
+
+  @@index([expenseCategoryId])
+  @@index([storeId])
+}
+
+model ExpenseImage {
+  id          String @id @default(uuid())
+  url         String
+  referenceId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  expenseId String? // allows it to be null when no image is uploaded
+  expense   Expense? @relation("ExpenseToExpenseImage", fields: [expenseId], references: [id])
+
+  @@index([expenseId])
+}
+
+model Appointment {
+  id   String   @id @default(uuid())
+  type String
+  time String
+  date DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  storeId String
+  store   Store  @relation("StoreToAppointment", fields: [storeId], references: [id], onDelete: Cascade)
+
+  //appointment -> orders
+  order Order? @relation("OrderToAppointment")
+
+  @@index([storeId])
+}
+
+model Order {
+  id            String  @id @default(uuid())
+  name          String //client name
+  unit          String?
+  quantity      Int     @default(1) // default quantity 1
+  amountPaid    Decimal @default(0) // default amount_paid 0
+  balance       Decimal @default(0) // default balance 0
+  phone         String
+  headSize      String?
+  paymentMethod String
+  status        String  @default("pending")
+  type          String  @default("walk-in") // walk-in made by admin and online products bought online
+  month         String
+  year          Int
+  note          String? @db.Text //large size info
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  orderCategories OrderCategory[]
+
+  storeId String
+  store   Store  @relation("StoreToOrder", fields: [storeId], references: [id])
+
+  //order -> appointments
+  appointmentId String?
+  appointment   Appointment? @relation("OrderToAppointment", fields: [appointmentId], references: [id], onDelete: Cascade)
+
+  @@unique([appointmentId])
+  @@index([storeId])
+}
+
+model OrderCategory {
+  id              String  @id @default(uuid())
+  name            String
+  appointmentUse  Boolean @default(false) // select to be available to use in appointments
+  comissionAmount Decimal @default(0) // set a cusom commission amount for each service
+  storeAmount     Decimal @default(0)
+  nonStoreAmount  Decimal @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  orders     Order[]
+  comissions Comission[]
+
+  storeId String
+  store   Store  @relation("StoreToOrderCategory", fields: [storeId], references: [id])
+
+  @@index([storeId])
+}
+
+model PushNotifications {
+  id       String  @id @default(uuid())
+  userId   String
+  pushSub  String  @db.Text
+  device   String  @db.Text
+  isActive Boolean @default(true)
+  role     String  @default("user") // both admins / users
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  storeId String
+  store   Store  @relation("StoreToNotification", fields: [storeId], references: [id])
+
+  @@index([storeId])
+}
+
+//commission
+model Comission {
+  id    String  @id @default(uuid())
+  name  String
+  unit  String
+  total Decimal
+  month String
+  year  Int
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+  paid      Boolean  @default(false)
+
+  storeId String
+  store   Store  @relation("StoreToComission", fields: [storeId], references: [id])
+
+  orderCategories OrderCategory[] // service
+
+  @@index([storeId])
+}
+
+// products
+model ProductCategory {
+  id          String @id @default(uuid())
+  name        String
+  url         String
+  referenceId String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  products Product[]
+
+  storeId String
+  store   Store  @relation("StoreToProductCategory", fields: [storeId], references: [id])
+
+  @@index([storeId])
+}
+
+model Product {
+  id          String  @id @default(uuid())
+  title       String
+  description String  @db.Text
+  price       Int
+  rating      Int     @default(0)
+  reviews     Int     @default(0)
+  sold        Int     @default(0)
+  isPublic    Boolean @default(true) // allow clients to see the product
+  inStock     Int // quantity in stock
+  discount    Int     @default(0) // discounts are available
+  size        String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now())
+
+  productCategoryId String
+  productCategory   ProductCategory @relation(fields: [productCategoryId], references: [id])
+
+  productImages ProductImage[] // set max to 4
+  colors        Color[]
+
+  storeId String
+  store   Store  @relation("StoreToProduct", fields: [storeId], references: [id])
+
+  @@index([productCategoryId])
+  @@index([storeId])
+}
+
+model ProductImage {
+  id          String @id @default(uuid())
+  url         String
+  referenceId String
+
+  product Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+//api-keys
+model ApiKey {
+  id     String  @id @default(uuid())
+  apiKey String
+  active Boolean @default(true)
+  copied Boolean @default(false) // can only be copied once
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  storeId String
+  store   Store  @relation("StoreToApiKey", fields: [storeId], references: [id])
+
+  @@index([storeId])
+}
+
+//gallery
+model Gallery {
+  id        String  @id @default(uuid())
+  name      String
+  unit      String
+  instagram String? // instagram link
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// reviews
+// global by default (can be accessed by all stores)
+model Color {
+  id    String @id @default(uuid())
+  name  String
+  value String
+
+  product Product[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
